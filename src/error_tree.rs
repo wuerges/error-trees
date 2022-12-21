@@ -7,8 +7,6 @@ pub enum ErrorTree<L, E> {
     Vec(Vec<ErrorTree<L, E>>),
 }
 
-pub trait ErrorLeaf {}
-
 impl<L, E> From<Vec<E>> for ErrorTree<L, E>
 where
     E: Into<ErrorTree<L, E>>,
@@ -27,10 +25,7 @@ where
     }
 }
 
-impl<L, E> From<E> for ErrorTree<L, E>
-where
-    E: ErrorLeaf,
-{
+impl<L, E> From<E> for ErrorTree<L, E> {
     fn from(error: E) -> Self {
         Self::Leaf(error)
     }
@@ -66,80 +61,25 @@ impl<L, E> ErrorTree<L, E> {
 
 trait LabelError<L, E>
 where
-    E: ErrorLeaf,
+    E: Into<ErrorTree<L, E>>,
 {
-    fn into_leaf(self) -> ErrorTree<L, E>;
     fn label_error(self, label: L) -> ErrorTree<L, E>;
 }
 
 trait LabelResult<T, L, E>
 where
-    E: ErrorLeaf,
+    E: Into<ErrorTree<L, E>>,
 {
-    fn into_tree(self) -> Result<T, ErrorTree<L, E>>;
     fn label_result(self, label: L) -> Result<T, ErrorTree<L, E>>;
 }
 
-impl<L, E> LabelError<L, E> for E
-where
-    E: ErrorLeaf,
-{
-    fn into_leaf(self) -> ErrorTree<L, E> {
-        ErrorTree::Leaf(self)
-    }
-
+impl<L, E> LabelError<L, E> for E {
     fn label_error(self, label: L) -> ErrorTree<L, E> {
-        ErrorTree::Edge(label, Box::new(self.into_leaf()))
+        ErrorTree::Edge(label, Box::new(self.into()))
     }
 }
 
-impl<L, E> LabelError<L, E> for ErrorTree<L, E>
-where
-    E: ErrorLeaf,
-{
-    fn into_leaf(self) -> ErrorTree<L, E> {
-        self
-    }
-
-    fn label_error(self, label: L) -> ErrorTree<L, E> {
-        ErrorTree::Edge(label, Box::new(self.into_leaf()))
-    }
-}
-
-impl<L, E> LabelError<L, E> for Vec<E>
-where
-    E: ErrorLeaf,
-{
-    fn into_leaf(self) -> ErrorTree<L, E> {
-        self.into()
-    }
-
-    fn label_error(self, label: L) -> ErrorTree<L, E> {
-        ErrorTree::Edge(label, Box::new(self.into_leaf()))
-    }
-}
-
-impl<L, E> LabelError<L, E> for Vec<ErrorTree<L, E>>
-where
-    E: ErrorLeaf,
-{
-    fn into_leaf(self) -> ErrorTree<L, E> {
-        self.into()
-    }
-
-    fn label_error(self, label: L) -> ErrorTree<L, E> {
-        ErrorTree::Edge(label, Box::new(self.into_leaf()))
-    }
-}
-
-impl<L, E, T> LabelResult<T, L, E> for Result<T, E>
-where
-    E: ErrorLeaf,
-{
-    fn into_tree(self) -> Result<T, ErrorTree<L, E>> {
-        self.map_err(|e| e.into_leaf())
-    }
-
+impl<L, E, T> LabelResult<T, L, E> for Result<T, E> {
     fn label_result(self, label: L) -> Result<T, ErrorTree<L, E>> {
         self.map_err(|e| e.label_error(label))
     }
@@ -153,8 +93,6 @@ mod tests {
 
     #[derive(Debug)]
     struct Error(String);
-
-    impl ErrorLeaf for Error {}
 
     fn faulty(error: &str) -> Result<(), Error> {
         Err(Error(error.into()))
