@@ -55,6 +55,48 @@ impl<L, E> ErrorTree<L, E> {
     }
 }
 
+trait LabelError<L, E>
+where
+    E: ErrorLeaf,
+{
+    fn into_leaf(self) -> ErrorTree<L, E>;
+    fn label_error(self, label: L) -> ErrorTree<L, E>;
+}
+
+trait LabelResult<T, L, E>
+where
+    E: ErrorLeaf,
+{
+    fn into_tree(self) -> Result<T, ErrorTree<L, E>>;
+    fn label_result(self, label: L) -> Result<T, ErrorTree<L, E>>;
+}
+
+impl<L, E> LabelError<L, E> for E
+where
+    E: ErrorLeaf,
+{
+    fn into_leaf(self) -> ErrorTree<L, E> {
+        ErrorTree::Leaf(self)
+    }
+
+    fn label_error(self, label: L) -> ErrorTree<L, E> {
+        ErrorTree::Edge(label, Box::new(self.into_leaf()))
+    }
+}
+
+impl<L, E, T> LabelResult<T, L, E> for Result<T, E>
+where
+    E: ErrorLeaf,
+{
+    fn into_tree(self) -> Result<T, ErrorTree<L, E>> {
+        self.map_err(|e| e.into_leaf())
+    }
+
+    fn label_result(self, label: L) -> Result<T, ErrorTree<L, E>> {
+        self.map_err(|e| e.label_error(label))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
@@ -72,8 +114,8 @@ mod tests {
 
     #[test]
     fn can_build_tree_from_vec_of_errors() -> Result<(), Error> {
-        let error1 = faulty("error1");
-        let error2 = faulty("error2");
+        let error1 = faulty("error1").label_result("label1");
+        let error2 = faulty("error2").label_result("label2");
 
         let (_, errors): (Vec<_>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
 
