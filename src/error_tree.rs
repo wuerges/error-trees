@@ -18,6 +18,15 @@ where
     }
 }
 
+impl<L, E> From<Vec<ErrorTree<L, E>>> for ErrorTree<L, E>
+where
+    E: Into<ErrorTree<L, E>>,
+{
+    fn from(errors: Vec<ErrorTree<L, E>>) -> Self {
+        Self::Vec(errors)
+    }
+}
+
 impl<L, E> From<E> for ErrorTree<L, E>
 where
     E: ErrorLeaf,
@@ -84,6 +93,45 @@ where
     }
 }
 
+impl<L, E> LabelError<L, E> for ErrorTree<L, E>
+where
+    E: ErrorLeaf,
+{
+    fn into_leaf(self) -> ErrorTree<L, E> {
+        self
+    }
+
+    fn label_error(self, label: L) -> ErrorTree<L, E> {
+        ErrorTree::Edge(label, Box::new(self.into_leaf()))
+    }
+}
+
+impl<L, E> LabelError<L, E> for Vec<E>
+where
+    E: ErrorLeaf,
+{
+    fn into_leaf(self) -> ErrorTree<L, E> {
+        self.into()
+    }
+
+    fn label_error(self, label: L) -> ErrorTree<L, E> {
+        ErrorTree::Edge(label, Box::new(self.into_leaf()))
+    }
+}
+
+impl<L, E> LabelError<L, E> for Vec<ErrorTree<L, E>>
+where
+    E: ErrorLeaf,
+{
+    fn into_leaf(self) -> ErrorTree<L, E> {
+        self.into()
+    }
+
+    fn label_error(self, label: L) -> ErrorTree<L, E> {
+        ErrorTree::Edge(label, Box::new(self.into_leaf()))
+    }
+}
+
 impl<L, E, T> LabelResult<T, L, E> for Result<T, E>
 where
     E: ErrorLeaf,
@@ -119,9 +167,11 @@ mod tests {
 
         let (_, errors): (Vec<_>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
 
-        let tree: ErrorTree<&'static str, _> = errors.into();
+        let tree: ErrorTree<&'static str, _> = errors.label_error("parent_label");
 
-        let _flat_errors = tree.flatten_tree();
+        let flat_errors = tree.flatten_tree();
+
+        assert!(false, "{:#?}", flat_errors);
 
         Ok(())
     }
