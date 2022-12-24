@@ -8,6 +8,9 @@
 use itertools::Itertools;
 
 /// The error Tree structure.
+///
+/// - `L` is the Label type.
+/// - `E` is the inner Error type. It can be an error enum (from the thiserror package).
 #[derive(Debug)]
 pub enum ErrorTree<L, E> {
     /// Stores your single error type.
@@ -19,7 +22,16 @@ pub enum ErrorTree<L, E> {
 }
 
 impl<L, E> ErrorTree<L, E> {
-    /// Creates a `Leaf` tree from an `error`.
+    /**
+    Creates a `Leaf` tree from an `error`.
+
+    ```rust
+    # use itertools::*;
+    # use error_trees::*;
+    struct Error(String);
+    let error_tree = ErrorTree::<&'static str, _>::leaf(Error("error".into()));
+    ```
+    */
     pub fn leaf(error: E) -> Self {
         Self::Leaf(error)
     }
@@ -38,7 +50,49 @@ impl<L, E> ErrorTree<L, E>
 where
     L: Clone,
 {
-    /// Flattens the error tree in a `Vec` of `FlatError`s.
+    /**
+    Flattens the error tree in a `Vec` of `FlatError`s.
+
+    ```rust
+    # use itertools::*;
+    # use error_trees::*;
+    #[derive(Debug)]
+    struct Error(String);
+
+    let error_1 = ErrorTree::leaf(Error("error1".into())).with_label("label1");
+    let error_2 = ErrorTree::leaf(Error("error2".into())).with_label("label2");
+
+    let errors = vec![error_1, error_2];
+
+    let tree: ErrorTree<&'static str, Error> = errors.into();
+    let tree = tree.with_label("parent_label");
+
+    let flat_errors = tree.flatten_tree();
+
+    assert!(
+        matches!(
+            &flat_errors[..],
+            [
+                FlatError {
+                    path: path1,
+                    error: Error(error1),
+                },
+                FlatError {
+                    path: path2,
+                    error: Error(error2),
+                },
+            ]
+            if path1 == &vec!["label1", "parent_label"]
+            && path2 == &vec!["label2", "parent_label"]
+            && error1 == "error1"
+            && error2 == "error2"
+        ),
+        "unexpected: {:#?}",
+        flat_errors
+    );
+    ```
+    */
+
     pub fn flatten_tree(self) -> Vec<FlatError<L, E>> {
         match self {
             ErrorTree::Leaf(error) => vec![FlatError {
