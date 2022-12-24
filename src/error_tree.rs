@@ -19,8 +19,11 @@ pub struct FlatError<L, E> {
     pub error: E,
 }
 
-impl<L, E> ErrorTree<L, E> {
-    pub fn flatten_tree(&self) -> Vec<FlatError<&L, &E>> {
+impl<L, E> ErrorTree<L, E>
+where
+    L: Clone,
+{
+    pub fn flatten_tree(self) -> Vec<FlatError<L, E>> {
         match self {
             ErrorTree::Leaf(error) => vec![FlatError {
                 path: Vec::new(),
@@ -29,7 +32,7 @@ impl<L, E> ErrorTree<L, E> {
             ErrorTree::Edge(label, tree) => {
                 let mut flat_errors = tree.flatten_tree();
                 for flat in &mut flat_errors {
-                    flat.path.push(&label);
+                    flat.path.push(label.clone());
                 }
                 flat_errors
             }
@@ -127,34 +130,51 @@ mod tests {
         Err(Error(error.into()))
     }
 
-    // #[test]
-    // fn can_build_tree_from_vec_of_errors() -> Result<(), Error> {
-    //     let error1 = faulty("error1").label_result("label1");
-    //     let error2 = faulty("error2").label_result("label2");
+    #[test]
+    fn can_build_tree_from_vec_of_results() -> Result<(), Error> {
+        let result_1 = faulty("error1").map_err(|e| e.into_tree_with_label("label1"));
+        let result_2 = faulty("error2").map_err(|e| e.into_tree_with_label("label2"));
 
-    //     let (_, errors): (Vec<_>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
+        let (_, errors): (Vec<_>, Vec<_>) = vec![result_1, result_2].into_iter().partition_result();
 
-    //     let tree: ErrorTree<&'static str, _> = errors.label_error("parent_label");
+        let tree: ErrorTree<&'static str, Error> = errors.into();
+        let tree = tree.into_tree_with_label("parent_label");
 
-    //     let flat_errors = tree.flatten_tree();
+        let flat_errors = tree.flatten_tree();
 
-    //     assert!(false, "{:#?}", flat_errors);
+        assert!(false, "{:#?}", flat_errors);
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
-    // #[test]
-    // fn can_partition_tree_from_vec_of_errors() -> Result<(), ErrorTree<&'static str, Error>> {
-    //     let error1 = faulty("error1").label_result("label1");
-    //     let error2 = faulty("error2").label_result("label2");
+    #[test]
+    fn can_call_into_result_from_vec_of_results() -> Result<(), Error> {
+        let result_1 = faulty("error1").map_err(|e| e.into_tree_with_label("label1"));
+        let result_2 = faulty("error2").map_err(|e| e.into_tree_with_label("label2"));
 
-    //     // let oks: Vec<()> = vec![error1, error2]
-    //     //     .into_iter()
-    //     //     .partition_result()
-    //     //     .into_result()?;
+        let result: Result<(), _> = vec![result_1, result_2]
+            .into_iter()
+            .partition_result()
+            .into_result();
 
-    //     let (oks, errors): (Vec<()>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
+        let flat_result = result.map_err(|e| e.flatten_tree());
 
-    //     ((), errors).into_result()
-    // }
+        assert!(false, "{:#?}", flat_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_call_into_result_from_vec_of_errors() -> Result<(), Error> {
+        let error1 = Error("error1".into()).into_tree_with_label("label1");
+        let error2 = Error("error2".into()).into_tree_with_label("label2");
+
+        let result = vec![error1, error2].into_result();
+
+        let flat_result = result.map_err(|e| e.flatten_tree());
+
+        assert!(false, "{:#?}", flat_result);
+
+        Ok(())
+    }
 }
