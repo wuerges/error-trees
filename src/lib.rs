@@ -122,6 +122,7 @@ pub trait IntoResult<T, E1, E2> {
 
     let result1: Result<(), Error> = Err(Error("first".into()));
     let result2: Result<(), Error> = Err(Error("second".into()));
+
     let final_result: Result<_, Vec<Error>> = vec![result1, result2]
         .into_iter()
         .partition_result::<Vec<_>, Vec<_>, _, _>()
@@ -130,8 +131,8 @@ pub trait IntoResult<T, E1, E2> {
 
     For `errors: Vec<E>`:
     - It checks if `errors` is empty.
-        - If true, it will return `Ok(())`.
-        - Otherwise, it will return `Err(errors)`.
+    - If true, it will return `Ok(())`.
+    - Otherwise, it will return `Err(errors)`.
 
     Since the trait is implemented for tuples of `(success: T, errors: Vec<E>)`
     and for `Vec<E>`, it works well with `partition_result` from the `itertools` crate!
@@ -139,9 +140,12 @@ pub trait IntoResult<T, E1, E2> {
     ```rust
     # use itertools::*;
     # use error_trees::*;
-    # let result1: Result<(), ErrorTree<(), ()>> = Ok(());
-    # let result2: Result<(), ErrorTree<(), ()>> = Ok(());
-    vec![result1, result2]
+    struct Error(String);
+
+    let result1: Result<(), Error> = Err(Error("first".into()));
+    let result2: Result<(), Error> = Err(Error("second".into()));
+
+    let final_result: Result<_, Vec<Error>> = vec![result1, result2]
         .into_iter()
         .partition_result::<Vec<_>, Vec<_>, _, _>()
         .into_result();
@@ -178,23 +182,19 @@ where
     }
 }
 
-/**
-Convenience trait to convert tuple of `(success: T, errors: Vec<E>)` to a `result : Result<T, ErrorTree<L, E>>`
-
-This works well with `partition_result` from the `itertools` crate!
-```rust
-# use itertools::*;
-# use error_trees::*;
-# let result1: Result<(), ErrorTree<(), ()>> = Ok(());
-# let result2: Result<(), ErrorTree<(), ()>> = Ok(());
-vec![result1, result2]
-    .into_iter()
-    .partition_result::<Vec<_>, Vec<_>, _, _>()
-    .into_result();
-```
-*/
-
+/// Convenience trait to label errors within a `Result`.
 pub trait LabelResult<T, L, E> {
+    /**
+    Maps a label to the `ErrorTree` within the result.
+
+    ```rust
+    # use itertools::*;
+    # use error_trees::*;
+    struct Error(String);
+    let result: Result<(), ErrorTree<&'static str, Error>> = Ok(());
+    let labeled_result = result.label_error("the label");
+    ```
+    */
     fn label_error(self, label: L) -> Result<T, ErrorTree<L, E>>;
 }
 
@@ -365,11 +365,11 @@ mod tests {
         let result1 = faulty_function().label_error("first faulty");
         let result2 = faulty_function().label_error("second faulty");
 
-        vec![result1, result2]
+        let result: Result<_, ErrorTree<_, _>> = vec![result1, result2]
             .into_iter()
             .partition_result::<Vec<_>, Vec<_>, _, _>()
-            .into_result()
-            .label_error("parent function")
+            .into_result();
+        result.label_error("parent function")
     }
 
     // your main function
