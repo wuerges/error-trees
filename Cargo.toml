@@ -1,7 +1,12 @@
 [package]
+license = "MIT"
+description = "Fail with multiple errors, istead of only the first."
 name = "error-trees"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/wuerges/error-trees"
+keywords = ["errors"]
+categories = ["rust-patterns"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
