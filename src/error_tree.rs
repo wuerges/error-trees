@@ -111,6 +111,41 @@ where
     }
 }
 
+pub trait LabelResult<T, L, E> {
+    fn label_error(self, label: L) -> Result<T, ErrorTree<L, E>>;
+}
+
+impl<T, L, E> LabelResult<T, L, E> for Result<T, E>
+where
+    ErrorTree<L, E>: From<E>,
+{
+    fn label_error(self, label: L) -> Result<T, ErrorTree<L, E>> {
+        self.map_err(|e| {
+            let tree: ErrorTree<L, E> = e.into();
+            tree.into_tree_with_label(label)
+        })
+    }
+}
+
+impl<T, L, E> LabelResult<T, L, E> for Result<T, ErrorTree<L, E>> {
+    fn label_error(self, label: L) -> Result<T, ErrorTree<L, E>> {
+        self.map_err(|tree| tree.into_tree_with_label(label))
+    }
+}
+
+pub trait FlattenResultErrors<T, L, E> {
+    fn flatten_results(self) -> Result<T, Vec<FlatError<L, E>>>;
+}
+
+impl<T, L, E> FlattenResultErrors<T, L, E> for Result<T, ErrorTree<L, E>>
+where
+    L: Clone,
+{
+    fn flatten_results(self) -> Result<T, Vec<FlatError<L, E>>> {
+        self.map_err(|tree| tree.flatten_tree())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
@@ -236,7 +271,6 @@ mod tests {
         );
     }
 
-
     // For the README
     // A function that returns an error
     fn faulty_function() -> Result<(), Error> {
@@ -244,16 +278,16 @@ mod tests {
     }
 
     // A function that returns more than one error
-    fn parent_function() -> Result<((), ()), ErrorTree<&'static str, Error>> {
+    fn parent_function() -> Result<Vec<()>, ErrorTree<&'static str, Error>> {
         let result1 = faulty_function().label_error("first faulty");
         let result2 = faulty_function().label_error("second faulty");
 
-        vec![result1, result2].into_iter()
+        vec![result1, result2]
+            .into_iter()
             .partition_result()
             .into_result()
             .label_error("parent function")
     }
-
 
     // your main function
     #[test]
@@ -261,7 +295,7 @@ mod tests {
         let result = parent_function();
 
         let flat_results = result.flatten_results();
-        let flat_errors : Vec<FlatError<&str, Error>>> = tree.unwrap_err();
+        let flat_errors: Vec<FlatError<&str, Error>> = flat_results.unwrap_err();
 
         assert!(
             matches!(
