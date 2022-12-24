@@ -105,22 +105,48 @@ where
     }
 }
 
-/**
-Convenience trait to convert tuple of `(success: T, errors: Vec<E>)` to a `result : Result<T, ErrorTree<L, E>>`
+/// Convenience trait to convert tuple of `(success: T, errors: Vec<E>)` to a `result : Result<T, ErrorTree<L, E>>`
+pub trait IntoResult<T, E1> {
+    /**
+    Turns `self` into a `Result`.
 
-This works well with `partition_result` from the `itertools` crate!
-```rust
-# use itertools::*;
-# use error_trees::*;
-# let result1: Result<(), ErrorTree<(), ()>> = Ok(());
-# let result2: Result<(), ErrorTree<(), ()>> = Ok(());
-vec![result1, result2]
-    .into_iter()
-    .partition_result::<Vec<_>, Vec<_>, _, _>()
-    .into_result();
-```
-*/
-pub trait IntoResult<T, E> {
+    For tuples of `(success: T, errors: Vec<E>)`:
+    - It checks if `errors` is empty.
+        - If true, it will return `Ok(success)`.
+        - Otherwise it will return `Err(errors)`.
+
+    ```rust
+    # use itertools::*;
+    # use error_trees::*;
+    struct Error(String);
+
+    let result1: Result<(), Error> = Err(Error("first".into()));
+    let result2: Result<(), Error> = Err(Error("second".into()));
+    let final_result: Result<_, Vec<Error>> = vec![result1, result2]
+        .into_iter()
+        .partition_result::<Vec<_>, Vec<_>, _, _>()
+        .into_result();
+    ```
+
+    For `errors: Vec<E>`:
+    - It checks if `errors` is empty.
+        - If true, it will return `Ok(())`.
+        - Otherwise, it will return `Err(errors)`.
+
+    Since the trait is implemented for tuples of `(success: T, errors: Vec<E>)`
+    and for `Vec<E>`, it works well with `partition_result` from the `itertools` crate!
+
+    ```rust
+    # use itertools::*;
+    # use error_trees::*;
+    # let result1: Result<(), ErrorTree<(), ()>> = Ok(());
+    # let result2: Result<(), ErrorTree<(), ()>> = Ok(());
+    vec![result1, result2]
+        .into_iter()
+        .partition_result::<Vec<_>, Vec<_>, _, _>()
+        .into_result();
+    ```
+    */
     fn into_result(self) -> Result<T, E>;
 }
 
