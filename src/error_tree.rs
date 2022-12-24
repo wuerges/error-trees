@@ -7,27 +7,9 @@ pub enum ErrorTree<L, E> {
     Vec(Vec<ErrorTree<L, E>>),
 }
 
-impl<L, E> From<Vec<E>> for ErrorTree<L, E>
-where
-    E: Into<ErrorTree<L, E>>,
-{
-    fn from(errors: Vec<E>) -> Self {
-        Self::Vec(errors.into_iter().map(|e| e.into()).collect_vec())
-    }
-}
-
-impl<L, E> From<Vec<ErrorTree<L, E>>> for ErrorTree<L, E>
-where
-    E: Into<ErrorTree<L, E>>,
-{
-    fn from(errors: Vec<ErrorTree<L, E>>) -> Self {
-        Self::Vec(errors)
-    }
-}
-
-impl<L, E> From<E> for ErrorTree<L, E> {
-    fn from(error: E) -> Self {
-        Self::Leaf(error)
+impl<L, E> ErrorTree<L, E> {
+    pub fn leaf(e: E) -> Self {
+        Self::Leaf(e)
     }
 }
 
@@ -59,29 +41,70 @@ impl<L, E> ErrorTree<L, E> {
     }
 }
 
-trait LabelError<L, E>
+trait IntoErrorTree<L, E> {
+    fn into_tree_with_label(self, label: L) -> ErrorTree<L, E>;
+}
+
+impl<L, E> IntoErrorTree<L, E> for E
 where
     E: Into<ErrorTree<L, E>>,
 {
-    fn label_error(self, label: L) -> ErrorTree<L, E>;
-}
-
-trait LabelResult<T, L, E>
-where
-    E: Into<ErrorTree<L, E>>,
-{
-    fn label_result(self, label: L) -> Result<T, ErrorTree<L, E>>;
-}
-
-impl<L, E> LabelError<L, E> for E {
-    fn label_error(self, label: L) -> ErrorTree<L, E> {
+    fn into_tree_with_label(self, label: L) -> ErrorTree<L, E> {
         ErrorTree::Edge(label, Box::new(self.into()))
     }
 }
 
-impl<L, E, T> LabelResult<T, L, E> for Result<T, E> {
-    fn label_result(self, label: L) -> Result<T, ErrorTree<L, E>> {
-        self.map_err(|e| e.label_error(label))
+impl<L, E> IntoErrorTree<L, E> for ErrorTree<L, E> {
+    fn into_tree_with_label(self, label: L) -> ErrorTree<L, E> {
+        ErrorTree::Edge(label, Box::new(self))
+    }
+}
+
+impl<L, E> From<Vec<ErrorTree<L, E>>> for ErrorTree<L, E> {
+    fn from(subtrees: Vec<ErrorTree<L, E>>) -> Self {
+        ErrorTree::Vec(subtrees)
+    }
+}
+
+impl<L, E> From<Vec<E>> for ErrorTree<L, E>
+where
+    E: IntoErrorTree<L, E>,
+    ErrorTree<L, E>: From<E>,
+{
+    fn from(errors: Vec<E>) -> Self {
+        ErrorTree::Vec(errors.into_iter().map(|x| x.into()).collect_vec())
+    }
+}
+
+pub trait IntoResult<T, E> {
+    fn into_result(self) -> Result<T, E>;
+}
+
+impl<T, E> IntoResult<T, E> for (T, Vec<E>)
+where
+    Vec<E>: Into<E>,
+{
+    fn into_result(self) -> Result<T, E> {
+        let (oks, errs) = self;
+
+        if errs.is_empty() {
+            Ok(oks)
+        } else {
+            Err(errs.into())
+        }
+    }
+}
+
+impl<E> IntoResult<(), E> for Vec<E>
+where
+    Vec<E>: Into<E>,
+{
+    fn into_result(self) -> Result<(), E> {
+        if self.is_empty() {
+            Ok(())
+        } else {
+            Err(self.into())
+        }
     }
 }
 
@@ -94,23 +117,44 @@ mod tests {
     #[derive(Debug)]
     struct Error(String);
 
+    impl<L> From<Error> for ErrorTree<L, Error> {
+        fn from(e: Error) -> Self {
+            Self::leaf(e)
+        }
+    }
+
     fn faulty(error: &str) -> Result<(), Error> {
         Err(Error(error.into()))
     }
 
-    #[test]
-    fn can_build_tree_from_vec_of_errors() -> Result<(), Error> {
-        let error1 = faulty("error1").label_result("label1");
-        let error2 = faulty("error2").label_result("label2");
+    // #[test]
+    // fn can_build_tree_from_vec_of_errors() -> Result<(), Error> {
+    //     let error1 = faulty("error1").label_result("label1");
+    //     let error2 = faulty("error2").label_result("label2");
 
-        let (_, errors): (Vec<_>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
+    //     let (_, errors): (Vec<_>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
 
-        let tree: ErrorTree<&'static str, _> = errors.label_error("parent_label");
+    //     let tree: ErrorTree<&'static str, _> = errors.label_error("parent_label");
 
-        let flat_errors = tree.flatten_tree();
+    //     let flat_errors = tree.flatten_tree();
 
-        assert!(false, "{:#?}", flat_errors);
+    //     assert!(false, "{:#?}", flat_errors);
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
+
+    // #[test]
+    // fn can_partition_tree_from_vec_of_errors() -> Result<(), ErrorTree<&'static str, Error>> {
+    //     let error1 = faulty("error1").label_result("label1");
+    //     let error2 = faulty("error2").label_result("label2");
+
+    //     // let oks: Vec<()> = vec![error1, error2]
+    //     //     .into_iter()
+    //     //     .partition_result()
+    //     //     .into_result()?;
+
+    //     let (oks, errors): (Vec<()>, Vec<_>) = vec![error1, error2].into_iter().partition_result();
+
+    //     ((), errors).into_result()
+    // }
 }
