@@ -106,7 +106,7 @@ where
 }
 
 /// Convenience trait to convert tuple of `(success: T, errors: Vec<E>)` to a `result : Result<T, ErrorTree<L, E>>`
-pub trait IntoResult<T, E1> {
+pub trait IntoResult<T, E1, E2> {
     /**
     Turns `self` into a `Result`.
 
@@ -147,14 +147,14 @@ pub trait IntoResult<T, E1> {
         .into_result();
     ```
     */
-    fn into_result(self) -> Result<T, E>;
+    fn into_result(self) -> Result<T, E2>;
 }
 
-impl<T, E> IntoResult<T, E> for (T, Vec<E>)
+impl<T, E1, E2> IntoResult<T, E1, E2> for (T, Vec<E1>)
 where
-    Vec<E>: Into<E>,
+    Vec<E1>: Into<E2>,
 {
-    fn into_result(self) -> Result<T, E> {
+    fn into_result(self) -> Result<T, E2> {
         let (oks, errs) = self;
 
         if errs.is_empty() {
@@ -165,11 +165,11 @@ where
     }
 }
 
-impl<E> IntoResult<(), E> for Vec<E>
+impl<E1, E2> IntoResult<(), E1, E2> for Vec<E1>
 where
-    Vec<E>: Into<E>,
+    Vec<E1>: Into<E2>,
 {
-    fn into_result(self) -> Result<(), E> {
+    fn into_result(self) -> Result<(), E2> {
         if self.is_empty() {
             Ok(())
         } else {
@@ -288,7 +288,7 @@ mod tests {
         let result_1 = faulty("error1").map_err(|e| e.with_label("label1"));
         let result_2 = faulty("error2").map_err(|e| e.with_label("label2"));
 
-        let result: Result<(), _> = vec![result_1, result_2]
+        let result: Result<(), ErrorTree<_, _>> = vec![result_1, result_2]
             .into_iter()
             .partition_result()
             .into_result();
@@ -325,7 +325,7 @@ mod tests {
         let error1 = Error("error1".into()).with_label("label1");
         let error2 = Error("error2".into()).with_label("label2");
 
-        let result = vec![error1, error2].into_result();
+        let result: Result<_, ErrorTree<_, _>> = vec![error1, error2].into_result();
 
         let flat_result = result.map_err(|e| e.flatten_tree());
 
@@ -367,7 +367,7 @@ mod tests {
 
         vec![result1, result2]
             .into_iter()
-            .partition_result()
+            .partition_result::<Vec<_>, Vec<_>, _, _>()
             .into_result()
             .label_error("parent function")
     }
