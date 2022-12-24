@@ -288,15 +288,6 @@ mod tests {
 
     use super::*;
 
-    #[derive(Debug)]
-    struct Error(String);
-
-    impl<L> From<Error> for ErrorTree<L, Error> {
-        fn from(e: Error) -> Self {
-            Self::leaf(e)
-        }
-    }
-
     fn faulty(error: &str) -> Result<(), Error> {
         Err(Error(error.into()))
     }
@@ -408,6 +399,17 @@ mod tests {
     }
 
     // For the README
+
+    // The error type
+    #[derive(Debug)]
+    struct Error(String);
+
+    impl<L> From<Error> for ErrorTree<L, Error> {
+        fn from(e: Error) -> Self {
+            Self::leaf(e)
+        }
+    }
+
     // A function that returns an error
     fn faulty_function() -> Result<(), Error> {
         Err(Error("error".into()))
