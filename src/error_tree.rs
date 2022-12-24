@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn can_build_tree_from_vec_of_results() -> Result<(), Error> {
+    fn can_build_tree_from_vec_of_results() {
         let result_1 = faulty("error1").map_err(|e| e.into_tree_with_label("label1"));
         let result_2 = faulty("error2").map_err(|e| e.into_tree_with_label("label2"));
 
@@ -142,13 +142,31 @@ mod tests {
 
         let flat_errors = tree.flatten_tree();
 
-        assert!(false, "{:#?}", flat_errors);
-
-        Ok(())
+        assert!(
+            matches!(
+                &flat_errors[..],
+                [
+                    FlatError {
+                        path: path1,
+                        error: Error(error1),
+                    },
+                    FlatError {
+                        path: path2,
+                        error: Error(error2),
+                    },
+                ]
+                if path1 == &vec!["label1", "parent_label"]
+                && path2 == &vec!["label2", "parent_label"]
+                && error1 == "error1"
+                && error2 == "error2"
+            ),
+            "unexpected: {:#?}",
+            flat_errors
+        );
     }
 
     #[test]
-    fn can_call_into_result_from_vec_of_results() -> Result<(), Error> {
+    fn can_call_into_result_from_vec_of_results() {
         let result_1 = faulty("error1").map_err(|e| e.into_tree_with_label("label1"));
         let result_2 = faulty("error2").map_err(|e| e.into_tree_with_label("label2"));
 
@@ -159,13 +177,33 @@ mod tests {
 
         let flat_result = result.map_err(|e| e.flatten_tree());
 
-        assert!(false, "{:#?}", flat_result);
+        let flat_errors = flat_result.unwrap_err();
 
-        Ok(())
+        assert!(
+            matches!(
+                &flat_errors[..],
+                [
+                    FlatError {
+                        path: path1,
+                        error: Error(error1),
+                    },
+                    FlatError {
+                        path: path2,
+                        error: Error(error2),
+                    },
+                ]
+                if path1 == &vec!["label1"]
+                && path2 == &vec!["label2"]
+                && error1 == "error1"
+                && error2 == "error2"
+            ),
+            "unexpected: {:#?}",
+            flat_errors
+        );
     }
 
     #[test]
-    fn can_call_into_result_from_vec_of_errors() -> Result<(), Error> {
+    fn can_call_into_result_from_vec_of_errors() {
         let error1 = Error("error1".into()).into_tree_with_label("label1");
         let error2 = Error("error2".into()).into_tree_with_label("label2");
 
@@ -173,8 +211,28 @@ mod tests {
 
         let flat_result = result.map_err(|e| e.flatten_tree());
 
-        assert!(false, "{:#?}", flat_result);
+        let flat_errors = flat_result.unwrap_err();
 
-        Ok(())
+        assert!(
+            matches!(
+                &flat_errors[..],
+                [
+                    FlatError {
+                        path: path1,
+                        error: Error(error1),
+                    },
+                    FlatError {
+                        path: path2,
+                        error: Error(error2),
+                    },
+                ]
+                if path1 == &vec!["label1"]
+                && path2 == &vec!["label2"]
+                && error1 == "error1"
+                && error2 == "error2"
+            ),
+            "unexpected: {:#?}",
+            flat_errors
+        );
     }
 }
