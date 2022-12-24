@@ -92,7 +92,6 @@ where
     );
     ```
     */
-
     pub fn flatten_tree(self) -> Vec<FlatError<L, E>> {
         match self {
             ErrorTree::Leaf(error) => vec![FlatError {
