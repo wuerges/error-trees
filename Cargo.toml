@@ -2,7 +2,7 @@
 license = "MIT"
 description = "Fail with multiple errors, istead of only the first."
 name = "error-trees"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 repository = "https://github.com/wuerges/error-trees"
 keywords = ["errors"]

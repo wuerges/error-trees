@@ -159,7 +159,7 @@ where
 }
 
 /// Convenience trait to convert tuple of `(success: T, errors: Vec<E>)` to a `result : Result<T, ErrorTree<L, E>>`
-pub trait IntoResult<T, E1, E2> {
+pub trait IntoResult<T, E> {
     /**
     Turns `self` into a `Result`.
 
@@ -172,13 +172,18 @@ pub trait IntoResult<T, E1, E2> {
     # use itertools::*;
     # use error_trees::*;
     struct Error(String);
+    impl<L> From<Error> for ErrorTree<L, Error> {
+        fn from(e: Error) -> Self {
+            Self::leaf(e)
+        }
+    }
 
-    let result1: Result<(), Error> = Err(Error("first".into()));
-    let result2: Result<(), Error> = Err(Error("second".into()));
+    let result1: Result<(), _> = Err(Error("first".into())).label_error("one");
+    let result2: Result<(), _> = Err(Error("second".into())).label_error("two");
 
-    let final_result: Result<_, Vec<Error>> = vec![result1, result2]
+    let final_result: Result<Vec<_>, ErrorTree<_, _>> = vec![result1, result2]
         .into_iter()
-        .partition_result::<Vec<_>, Vec<_>, _, _>()
+        .partition_result()
         .into_result();
     ```
 
@@ -195,25 +200,22 @@ pub trait IntoResult<T, E1, E2> {
     # use error_trees::*;
     struct Error(String);
 
-    let result1: Result<(), Error> = Err(Error("first".into()));
-    let result2: Result<(), Error> = Err(Error("second".into()));
+    let error1 = ErrorTree::leaf(Error("first".into())).with_label("one");
+    let error2 = ErrorTree::leaf(Error("second".into())).with_label("two");
 
-    let final_result: Result<_, Vec<Error>> = vec![result1, result2]
-        .into_iter()
-        .partition_result::<Vec<_>, Vec<_>, _, _>()
+    let final_result: Result<_, ErrorTree<_, _>> = vec![error1, error2]
         .into_result();
     ```
     */
-    fn into_result(self) -> Result<T, E2>;
+    fn into_result(self) -> Result<T, E>;
 }
 
-impl<T, E1, E2> IntoResult<T, E1, E2> for (T, Vec<E1>)
+impl<T, IE, E> IntoResult<T, E> for (T, Vec<IE>)
 where
-    Vec<E1>: Into<E2>,
+    Vec<IE>: Into<E>,
 {
-    fn into_result(self) -> Result<T, E2> {
+    fn into_result(self) -> Result<T, E> {
         let (oks, errs) = self;
-
         if errs.is_empty() {
             Ok(oks)
         } else {
@@ -222,11 +224,11 @@ where
     }
 }
 
-impl<E1, E2> IntoResult<(), E1, E2> for Vec<E1>
+impl<IE, E> IntoResult<(), E> for Vec<IE>
 where
-    Vec<E1>: Into<E2>,
+    Vec<IE>: Into<E>,
 {
-    fn into_result(self) -> Result<(), E2> {
+    fn into_result(self) -> Result<(), E> {
         if self.is_empty() {
             Ok(())
         } else {
@@ -332,7 +334,7 @@ mod tests {
         let result_1 = faulty("error1").map_err(|e| e.with_label("label1"));
         let result_2 = faulty("error2").map_err(|e| e.with_label("label2"));
 
-        let result: Result<(), ErrorTree<_, _>> = vec![result_1, result_2]
+        let result: Result<Vec<()>, ErrorTree<_, _>> = vec![result_1, result_2]
             .into_iter()
             .partition_result()
             .into_result();
